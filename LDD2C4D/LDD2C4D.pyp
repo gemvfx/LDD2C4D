@@ -7,7 +7,7 @@ from c4d import bitmaps, gui, plugins, documents, utils
 from xml.dom import minidom
 
 PLUGIN_ID = 1038148
-VERSION = '1.0.0'
+VERSION = '1.0.0.1'
 
 print "- - - - - - - - - - - -"
 print "           _           "
@@ -39,12 +39,12 @@ IDC_TEXT_TEXTURE       = 1006
 IDC_BUTTON_TEXTURE     = 1007
 IDC_MAT_LINK           = 1010 
 
-IDM_MAT         = 2000
-IDM_MAT_BASIC   = 2001
-IDM_MAT_HQ      = 2002
-IDM_MAT_VRAY    = 2003
 
+# Material types
 
+MATERIAL_TYPE_C4D     = 5703
+MATERIAL_TYPE_NUKEI   = 1011122
+MATERIAL_TYPE_VRAY    = 1020295
 
 
 GEOMETRIEPATH = '/Primitives/LOD0/'
@@ -427,11 +427,6 @@ class LDDDialog(gui.GeDialog):
         self.GroupBorder(c4d.BORDER_GROUP_IN)
         self.GroupBorderSpace(5, 5, 5, 5)
         self.AddStaticText(id=1011, flags=c4d.BFH_LEFT, initw=0, inith=0, name="Please drag material here:")
-        #self.mat_template = self.AddComboBox(id=IDM_MAT, flags=c4d.BFH_LEFT, initw=100, inith=0)
-        #self.AddChild(id=IDM_MAT, subid=IDM_MAT_BASIC, child="Basic")
-        #self.AddChild(id=IDM_MAT, subid=IDM_MAT_HQ, child="High-Quality")
-        #self.AddChild(id=IDM_MAT, subid=IDM_MAT_VRAY, child="Vray For C4D")
-        #self.SetInt32(IDM_MAT, IDM_MAT_BASIC)
         self.linkTemplate = self.AddCustomGui(id=IDC_MAT_LINK, pluginid=c4d.CUSTOMGUI_LINKBOX, name="materialTemplate", flags=c4d.BFH_SCALEFIT|c4d.BFV_SCALEFIT, minw=0, minh=0)
         self.GroupEnd()
 
@@ -713,6 +708,8 @@ class LDDDialog(gui.GeDialog):
 
             return m
 
+        
+
     def buildMaterial(self, doc, lddmat):
         m = doc.SearchMaterial(str(lddmat.name))    # mat already present?
         if (m is None):
@@ -720,22 +717,35 @@ class LDDDialog(gui.GeDialog):
                 print "Using default material."
                 m = c4d.BaseMaterial(c4d.Mmaterial)
             else:
-                #m = self.cloneMaterial(doc=doc, template=self.mat_template)
                 m = self.linkTemplate.GetLink().GetClone()
                 
-
             m[c4d.ID_BASELIST_NAME] = str(lddmat.name)
-            m[c4d.MATERIAL_COLOR_COLOR] = c4d.Vector(lddmat.r / 255, lddmat.g / 255, lddmat.b / 255) 
+            if ( m.GetType() == MATERIAL_TYPE_C4D ):
+                print "Standard C4D material found."
+                m[c4d.MATERIAL_COLOR_COLOR] = c4d.Vector(lddmat.r / 255, lddmat.g / 255, lddmat.b / 255) 
 
-            if lddmat.a < 255:
-                m[c4d.MATERIAL_USE_COLOR] = False
-                m[c4d.MATERIAL_USE_TRANSPARENCY] = True
-                m[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = 1  # lddmat.a / 255
-                m[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1.575
-                m[c4d.MATERIAL_TRANSPARENCY_COLOR] = c4d.Vector(lddmat.r / 255, lddmat.g / 255, lddmat.b / 255)
-            else:
-                m[c4d.MATERIAL_USE_COLOR] = True
-                  
+                if lddmat.a < 255:
+                    m[c4d.MATERIAL_USE_COLOR] = False
+                    m[c4d.MATERIAL_USE_TRANSPARENCY] = True
+                    m[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = 1  # lddmat.a / 255
+                    m[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1.575
+                    m[c4d.MATERIAL_TRANSPARENCY_COLOR] = c4d.Vector(lddmat.r / 255, lddmat.g / 255, lddmat.b / 255)
+                else:
+                    m[c4d.MATERIAL_USE_COLOR] = True
+
+            if ( m.GetType() == MATERIAL_TYPE_VRAY ):
+                print "VRayForC4D material found."
+                if lddmat.a < 255:
+                    m[c4d.VRAYMATERIAL_USE_COLOR1] = False
+                    m[c4d.VRAYMATERIAL_USE_COLOR2] = False
+                    m[c4d.VRAYMATERIAL_USE_TRANSPARENCY] = True
+                    m[c4d.VRAYMATERIAL_TRANSPARENCY_BRIGHTNESS] = 1  # lddmat.a / 255
+                    m[c4d.VRAYMATERIAL_TRANSPARENCY_IOR] = 1.575
+                    m[c4d.VRAYMATERIAL_TRANSPARENCY_COLOR] = c4d.Vector(lddmat.r / 255, lddmat.g / 255, lddmat.b / 255)
+                else:
+                    m[c4d.VRAYMATERIAL_USE_COLOR1] = True
+                    m[c4d.VRAYMATERIAL_COLOR1_COLOR] = c4d.Vector(lddmat.r / 255, lddmat.g / 255, lddmat.b / 255)
+                
             doc.InsertMaterial(m)
             m.Update(True, False)
         return m
